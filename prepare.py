@@ -27,9 +27,10 @@ def prepare(i_file):
         w_log.append(np.array(df.loc[i:(i+skip-1), ['infected_log_nr', 'dead_log_nr']]))
         #print (i, np.array(df.loc[(i+skip), ['infected_nr', 'dead_nr']]))
         y.append(np.array(df.loc[(i+skip), ['infected_nr', 'dead_nr']]))
-    x = np.array(w)
+    x = np.array(w).astype(np.float32)
     x_log = np.array(w_log)
-    y = np.array(y)
+    y = np.array(y).astype(np.float32)
+    print ('x', x.dtype, 'y', y.dtype)
     #print (x_log)
     #re_x = x.reshape(x.shape[0], x.shape[1], 1)
     #re_x = x
@@ -45,15 +46,17 @@ def prepare(i_file):
 if __name__ == '__main__':
 
     import pickle
-    #i_file = '%s/data/covid19/nhk_news_covid19_domestic_daily_data.csv' % os.environ['HOME']
-    #i_file = '%s/data/covid19/nhk_news_covid19_domestic_daily_data-0809.csv' % os.environ['HOME']
-    i_file = 'data/csv/nhk_news_covid19_domestic_daily_data-0811.csv'
+    #i_file = 'data/csv/nhk_news_covid19_domestic_daily_data-0811.csv'
+    #i_file = 'data/csv/nhk_news_covid19_domestic_daily_data-0812.csv'
+    i_file = 'data/csv/nhk_news_covid19_domestic_daily_data-0815.csv'
     X, X_log, y, d = prepare(i_file)
     print ('X', X.shape)
     #with open('covid19-7day.pkl', 'wb') as o_handle:
     #with open('covid19-14day.pkl', 'wb') as o_handle:
     #with open('covid19-14day-0809.pkl', 'wb') as o_handle:
     #with open('covid19-14day-0809.pkl', 'wb') as o_handle:
-    o_file = 'data/pkl/covid19-14day-0811-id.pkl'
+    #o_file = 'data/pkl/covid19-14day-0811-id.pkl'
+    #o_file = 'data/pkl/covid19-14day-0812-id.pkl'
+    o_file = 'data/pkl/covid19-14day-0815-id.pkl'
     with open(o_file, 'wb') as o_handle:
         pickle.dump((X, X_log, y, d), o_handle)
