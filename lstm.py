@@ -3,14 +3,15 @@
 #                           lstm.py
 #
 
+import pandas as pd
 import numpy as np
 from keras.models import Sequential
 from keras.models import load_model
 from keras.layers import Dense, LSTM, Activation
 from tensorflow.keras.optimizers import Adam, RMSprop
-from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, CSVLogger
 from keras.regularizers import l1, l2
-from keras.callbacks import ModelCheckpoint, CSVLogger
+import matplotlib.pyplot as plt
 
 in_out_neurons = 2
 
@@ -23,27 +24,17 @@ def train(x, y):
     #in_out_neurons = 1
 
     model = Sequential()
-    """
     model.add(LSTM(
         n_hidden,
-        #dropout=0.5,
+        #dropout=0.2,
         #recurrent_dropout=0.5,
-        #kernel_regularizer=l2(0.01),
-        #bias_regularizer=l2(0.001),
-        batch_input_shape=(None, length_of_sequence, in_out_neurons),
-        return_sequences=True))
-    """
-    model.add(LSTM(
-        n_hidden,
-        #dropout=0.5,
-        #recurrent_dropout=0.5,
-        kernel_regularizer=l1(0.01),
+        #kernel_regularizer=l1(0.01),
         #kernel_regularizer=l1(0.001),
-        #kernel_regularizer=l2(0.01),
+        kernel_regularizer=l2(0.01),
         #kernel_regularizer=l2(0.001),
-        bias_regularizer=l1(0.01),
+        #bias_regularizer=l1(0.01),
         #bias_regularizer=l1(0.001),
-        #bias_regularizer=l2(0.01),
+        bias_regularizer=l2(0.01),
         #bias_regularizer=l2(0.001),
         #recurrent_regularizer=l2(0.01),
         batch_input_shape=(None, length_of_sequence, in_out_neurons),
@@ -58,9 +49,9 @@ def train(x, y):
     # TRAIN
     print ('TRAIN')
     #early_stopping = EarlyStopping(monitor='val_loss', mode='auto', patience=20)
-    csv_file = dir + timecode + '-loss.csv'
     callbacks = [
-    ModelCheckpoint(filepath= dir + timecode +'-{val_loss:.2f}-{epoch:04d}.hdf5',
+    ModelCheckpoint(
+        filepath= dir + timecode + '-{epoch:04d}-{val_loss:.3f}.hdf5',
         monitor='val_loss', verbose=1, save_best_only=True),
     CSVLogger(csv_file, append=True)
 ]
@@ -102,25 +93,10 @@ def predict_future(model, X, length):
 
 def plot(y, pred, d, f):
 
-    import matplotlib.pyplot as plt
     import matplotlib.dates as mdates
 
     infected_k  = 10000
     dead_k      = 100
-
-    """
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    #plt.plot(y)
-
-    print (d.values)
-    print (y)
-    plt.plot(d.values[:len(y)], y.reshape(len(y)))
-    dayｓ = mdates.DayLocator()
-    daysFmt = mdates.DateFormatter('%m/%d')
-    ax.xaxis.set_major_locator(days)
-    ax.xaxis.set_major_formatter(daysFmt)
-    """
 
     fig = plt.figure(figsize=(14,10))
     ax1 = fig.add_subplot(2, 1, 1)
@@ -140,6 +116,29 @@ def plot(y, pred, d, f):
     return
 
 
+def plot_loss(i_file, o_file):
+
+    #import matplotlib.pyplot as plt
+    #from matplotlib.backends.backend_pdf import PdfPages
+    #pp = PdfPages(o_file)
+    df = pd.read_csv(i_file, index_col=False)
+    plt.plot(df.epoch, df.loss,     c='k', label = 'Loss')
+    plt.plot(df.epoch, df.val_loss, c='b', label = 'Val Loss')
+    #plt.ylim((0,1.2))
+    plt.legend()
+    print ('OUTPUT LOSS GRAPH', o_file)
+    #pp.savefig()
+    plt.savefig(o_file)
+    plt.clf()
+
+    plt.plot(df.epoch, df.loss, label = 'Loss')
+    plt.plot(df.epoch, df.val_loss, label = 'Validation Loss')
+    plt.legend()
+    #pp.savefig(o_file)
+    plt.savefig(o_file)
+    plt.close()
+
+
 if __name__ == '__main__':
 
     import pickle
@@ -154,10 +153,12 @@ if __name__ == '__main__':
     #train_size = 560
     train_size = 563
     #n_epoch = 3
+    #n_epoch = 100
     n_epoch = 400
 
     now = datetime.datetime.now()
     timecode = now.strftime("%y%m%d-%H%M")     # like 210813-0909
+    #timecode = '210816-1707'    # FOR DEBUG
     dir = 'model/' + timecode + '/'
     if not os.path.isdir(dir):
         os.mkdir(dir)
@@ -176,8 +177,12 @@ if __name__ == '__main__':
     print ('X', X.dtype, X.shape)
     X_train, y_train = X[:train_size], y[:train_size]
     #X_train, y_train = X_log[:train_size], y[:train_size]
+
+    csv_file = dir + timecode + '-loss.csv'
+    l_file  = dir + timecode + '-loss.png'  # LOSS GRAPH
+
     model = train(X_train, y_train)
-    m_file = 'model/%s/%s.h5' % (timecode, timecode)
+    m_file = 'model/%s/%s.hdf5' % (timecode, timecode)
     t_file = 'model/%s/%s-model.txt' % (timecode, timecode)
     param['files'] = {}
     param['files']['resource']      = i_file
@@ -191,6 +196,8 @@ if __name__ == '__main__':
     model = None
     model = load_model(m_file)
 
+    plot_loss(csv_file, l_file)
+
     param['optimizer'] = {}
     param['optimizer']['name'] = model.optimizer._name
     param['optimizer']['learning_rate'] = float(model.optimizer._hyper['learning_rate'])
@@ -202,7 +209,7 @@ if __name__ == '__main__':
     future_result = predict_future(model, X_train, X.shape[0] - train_size + 90)
     con_pred = np.vstack([pred, future_result])
     print ('y', y.shape, 'con_pred', con_pred.shape)
-    g_file = 'model/%s/%s-graph.png' % (timecode, timecode)
+    g_file = 'model/%s/%s-predict.png' % (timecode, timecode)
     param['files']['analytical_graph'] = g_file
     plot(y, con_pred, d, g_file)
 
