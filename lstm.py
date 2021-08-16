@@ -9,7 +9,8 @@ from keras.models import load_model
 from keras.layers import Dense, LSTM, Activation
 from tensorflow.keras.optimizers import Adam, RMSprop
 from tensorflow.keras.callbacks import EarlyStopping
-from keras.regularizers import l2
+from keras.regularizers import l1, l2
+from keras.callbacks import ModelCheckpoint, CSVLogger
 
 in_out_neurons = 2
 
@@ -36,24 +37,39 @@ def train(x, y):
         n_hidden,
         #dropout=0.5,
         #recurrent_dropout=0.5,
+        kernel_regularizer=l1(0.01),
+        #kernel_regularizer=l1(0.001),
         #kernel_regularizer=l2(0.01),
+        #kernel_regularizer=l2(0.001),
+        bias_regularizer=l1(0.01),
+        #bias_regularizer=l1(0.001),
+        #bias_regularizer=l2(0.01),
         #bias_regularizer=l2(0.001),
+        #recurrent_regularizer=l2(0.01),
         batch_input_shape=(None, length_of_sequence, in_out_neurons),
         return_sequences=False))
     model.add(Dense(in_out_neurons))
-    model.add(Activation("linear"))
+    #model.add(Activation("linear"))
+    model.add(Activation("relu"))
     #optimizer = Adam(lr=0.001)
-    optimizer = RMSprop(lr=0.0001)
+    optimizer = RMSprop(lr=0.001)
     model.compile(loss="mean_squared_error", optimizer=optimizer)
 
     # TRAIN
     print ('TRAIN')
-    early_stopping = EarlyStopping(monitor='val_loss', mode='auto', patience=20)
+    #early_stopping = EarlyStopping(monitor='val_loss', mode='auto', patience=20)
+    csv_file = dir + timecode + '-loss.csv'
+    callbacks = [
+    ModelCheckpoint(filepath= dir + timecode +'-{val_loss:.2f}-{epoch:04d}.hdf5',
+        monitor='val_loss', verbose=1, save_best_only=True),
+    CSVLogger(csv_file, append=True)
+]
     model.fit(x, y,
           batch_size=100,
           epochs=n_epoch,
           validation_split=0.3,
-          callbacks=[early_stopping]
+          #callbacks=[early_stopping]
+          callbacks=callbacks
           )
     return model
 
@@ -106,7 +122,7 @@ def plot(y, pred, d, f):
     ax.xaxis.set_major_formatter(daysFmt)
     """
 
-    fig = plt.figure()
+    fig = plt.figure(figsize=(14,10))
     ax1 = fig.add_subplot(2, 1, 1)
     ax1.plot(y[:, 0] * infected_k,      c='k', label='#infected persons')
     ax1.plot(pred[:, 0] * infected_k,   c='b', label='#predicted infection')
@@ -131,12 +147,14 @@ if __name__ == '__main__':
     import datetime
     import os
 
-    n_hidden = 30
+    #n_hidden = 30
+    n_hidden = 300
     #train_size = 559
+    #train_size = 557
     #train_size = 560
     train_size = 563
     #n_epoch = 3
-    n_epoch = 300
+    n_epoch = 400
 
     now = datetime.datetime.now()
     timecode = now.strftime("%y%m%d-%H%M")     # like 210813-0909
